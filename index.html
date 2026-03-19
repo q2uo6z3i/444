@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Mini Smash Game キャラ選択付き</title>
+<title>Mini Smash Game 最終強化</title>
 <style>
 body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
 canvas { display:none; background:#87ceeb; }
@@ -23,16 +23,16 @@ button { margin:5px; padding:10px 20px; font-size:16px; }
 <canvas id="game"></canvas>
 <script>
 const animals = [
-  {name:"ネコ", color:"orange"},
-  {name:"イヌ", color:"brown"},
-  {name:"ウサギ", color:"white"},
-  {name:"トラ", color:"yellow"},
-  {name:"パンダ", color:"black"},
-  {name:"キツネ", color:"red"},
-  {name:"クマ", color:"darkbrown"},
-  {name:"カエル", color:"green"},
-  {name:"サル", color:"sienna"},
-  {name:"ライオン", color:"gold"}
+  {name:"ネコ", emoji:"🐱"},
+  {name:"イヌ", emoji:"🐶"},
+  {name:"ウサギ", emoji:"🐰"},
+  {name:"トラ", emoji:"🐯"},
+  {name:"パンダ", emoji:"🐼"},
+  {name:"キツネ", emoji:"🦊"},
+  {name:"クマ", emoji:"🐻"},
+  {name:"カエル", emoji:"🐸"},
+  {name:"サル", emoji:"🐵"},
+  {name:"ライオン", emoji:"🦁"}
 ];
 
 let selectedPlayer = 0;
@@ -43,12 +43,12 @@ const enemyDiv = document.getElementById("enemySelect");
 
 animals.forEach((a,i)=>{
   let b1 = document.createElement("button");
-  b1.textContent = a.name;
+  b1.textContent = a.emoji + " " + a.name;
   b1.onclick = ()=> selectedPlayer = i;
   playerDiv.appendChild(b1);
 
   let b2 = document.createElement("button");
-  b2.textContent = a.name;
+  b2.textContent = a.emoji + " " + a.name;
   b2.onclick = ()=> selectedEnemy = i;
   enemyDiv.appendChild(b2);
 });
@@ -68,15 +68,15 @@ class Fighter {
     this.y = canvas.height - 100;
     this.vx = 0;
     this.vy = 0;
-    this.width = 40;
-    this.height = 60;
-    this.color = data.color;
+    this.size = 40;
+    this.emoji = data.emoji;
     this.name = data.name;
     this.onGround = false;
     this.hp = 100;
     this.hitTimer = 0;
     this.attackTimer = 0;
     this.attackType = "";
+    this.dodgeTimer = 0;
   }
 
   physics() {
@@ -84,26 +84,29 @@ class Fighter {
     this.x += this.vx;
     this.y += this.vy;
 
-    if(this.y + this.height > canvas.height - 20) {
-      this.y = canvas.height - 20 - this.height;
+    if(this.y + this.size > canvas.height - 20) {
+      this.y = canvas.height - 20 - this.size;
       this.vy = 0;
       this.onGround = true;
     }
 
     if(this.hitTimer > 0) this.hitTimer--;
     if(this.attackTimer > 0) this.attackTimer--;
+    if(this.dodgeTimer > 0) this.dodgeTimer--;
   }
 
   draw() {
-    ctx.fillStyle = this.hitTimer > 0 ? "yellow" : this.color;
-    ctx.fillRect(this.x,this.y,this.width,this.height);
+    ctx.font = "40px serif";
 
-    ctx.fillStyle = "white";
-    ctx.fillText(this.name, this.x, this.y - 5);
+    if(this.dodgeTimer > 0) ctx.globalAlpha = 0.5;
+    else ctx.globalAlpha = 1;
+
+    ctx.fillText(this.emoji, this.x, this.y);
+    ctx.globalAlpha = 1;
 
     if(this.attackTimer > 0) {
       ctx.fillStyle = this.attackType === "strong" ? "red" : "orange";
-      ctx.fillRect(this.x + this.width, this.y+10, 30, 20);
+      ctx.fillRect(this.x + 30, this.y-30, 30, 20);
     }
   }
 }
@@ -129,6 +132,11 @@ function playerControl() {
     player.vy = -15;
     player.onGround = false;
   }
+
+  // 回避（スペースキー）
+  if(keys[' '] && player.dodgeTimer <= 0) {
+    player.dodgeTimer = 20;
+  }
 }
 
 function enemyAI() {
@@ -139,8 +147,10 @@ function enemyAI() {
     enemy.attackTimer = 15;
     enemy.attackType = Math.random() < 0.5 ? "weak" : "strong";
 
-    player.hp -= enemy.attackType === "weak" ? 5 : 15;
-    player.hitTimer = 10;
+    if(player.dodgeTimer <= 0) {
+      player.hp -= enemy.attackType === "weak" ? 5 : 15;
+      player.hitTimer = 10;
+    }
   }
 }
 
@@ -149,8 +159,10 @@ function playerAttack(type) {
   player.attackType = type;
 
   if(Math.abs(player.x - enemy.x) < 70) {
-    enemy.hp -= type === "weak" ? 5 : 15;
-    enemy.hitTimer = 10;
+    if(enemy.dodgeTimer <= 0) {
+      enemy.hp -= type === "weak" ? 5 : 15;
+      enemy.hitTimer = 10;
+    }
   }
 }
 
@@ -159,18 +171,18 @@ document.addEventListener("keydown", e => {
   if(e.key.toLowerCase() === 'g') playerAttack("strong");
 });
 
-function drawHPBar(x,y,hp,color,label) {
+function drawHPBar(x,y,hp,label) {
   ctx.fillStyle = "gray";
   ctx.fillRect(x,y,300,20);
-  ctx.fillStyle = color;
+  ctx.fillStyle = "lime";
   ctx.fillRect(x,y,300 * (hp/100),20);
   ctx.fillStyle = "white";
   ctx.fillText(label, x, y-5);
 }
 
 function drawUI() {
-  drawHPBar(50, canvas.height-60, player.hp, player.color, player.name);
-  drawHPBar(canvas.width-350, canvas.height-60, enemy.hp, enemy.color, enemy.name);
+  drawHPBar(50, canvas.height-60, player.hp, player.emoji + " " + player.name);
+  drawHPBar(canvas.width-350, canvas.height-60, enemy.hp, enemy.emoji + " " + enemy.name);
 }
 
 function checkWin() {
