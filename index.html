@@ -2,11 +2,12 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Mini Smash Game 最終強化</title>
+<title>Mini Smash Game AI強化版</title>
 <style>
 body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
 canvas { display:none; background:#87ceeb; }
 #menu { color:white; text-align:center; padding-top:50px; }
+#controls { position:absolute; top:10px; right:10px; color:white; }
 button { margin:5px; padding:10px 20px; font-size:16px; }
 </style>
 </head>
@@ -20,6 +21,16 @@ button { margin:5px; padding:10px 20px; font-size:16px; }
   <br>
   <button onclick="startGame()">ゲーム開始</button>
 </div>
+
+<div id="controls" style="display:none;">
+操作:<br>
+A/D 移動<br>
+W ジャンプ<br>
+F 弱攻撃<br>
+G 強攻撃<br>
+Space 回避
+</div>
+
 <canvas id="game"></canvas>
 <script>
 const animals = [
@@ -97,10 +108,7 @@ class Fighter {
 
   draw() {
     ctx.font = "40px serif";
-
-    if(this.dodgeTimer > 0) ctx.globalAlpha = 0.5;
-    else ctx.globalAlpha = 1;
-
+    ctx.globalAlpha = this.dodgeTimer > 0 ? 0.5 : 1;
     ctx.fillText(this.emoji, this.x, this.y);
     ctx.globalAlpha = 1;
 
@@ -115,6 +123,7 @@ let player, enemy;
 
 function startGame() {
   document.getElementById("menu").style.display = "none";
+  document.getElementById("controls").style.display = "block";
   canvas.style.display = "block";
 
   player = new Fighter(100, animals[selectedPlayer]);
@@ -133,7 +142,6 @@ function playerControl() {
     player.onGround = false;
   }
 
-  // 回避（スペースキー）
   if(keys[' '] && player.dodgeTimer <= 0) {
     player.dodgeTimer = 20;
   }
@@ -143,6 +151,18 @@ function enemyAI() {
   if(player.x < enemy.x) enemy.vx = -2;
   else enemy.vx = 2;
 
+  // ジャンプ
+  if(Math.random() < 0.01 && enemy.onGround) {
+    enemy.vy = -12;
+    enemy.onGround = false;
+  }
+
+  // 回避
+  if(Math.random() < 0.01 && enemy.dodgeTimer <= 0) {
+    enemy.dodgeTimer = 20;
+  }
+
+  // 攻撃
   if(Math.abs(player.x - enemy.x) < 70 && Math.random() < 0.02) {
     enemy.attackTimer = 15;
     enemy.attackType = Math.random() < 0.5 ? "weak" : "strong";
