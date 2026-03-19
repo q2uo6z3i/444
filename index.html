@@ -2,19 +2,57 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Mini Smash Game 強化版</title>
+<title>Mini Smash Game キャラ選択付き</title>
 <style>
-body { margin:0; overflow:hidden; background:#222; }
-canvas { display:block; background:#87ceeb; }
-#info {
-  position:absolute; top:10px; left:10px; color:white; font-family:sans-serif;
-}
+body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
+canvas { display:none; background:#87ceeb; }
+#menu { color:white; text-align:center; padding-top:50px; }
+button { margin:5px; padding:10px 20px; font-size:16px; }
 </style>
 </head>
 <body>
-<div id="info">A,D:移動 / W:ジャンプ / F:弱攻撃 / G:強攻撃</div>
+<div id="menu">
+  <h1>キャラクター選択</h1>
+  <p>プレイヤーを選択</p>
+  <div id="playerSelect"></div>
+  <p>敵を選択</p>
+  <div id="enemySelect"></div>
+  <br>
+  <button onclick="startGame()">ゲーム開始</button>
+</div>
 <canvas id="game"></canvas>
 <script>
+const animals = [
+  {name:"ネコ", color:"orange"},
+  {name:"イヌ", color:"brown"},
+  {name:"ウサギ", color:"white"},
+  {name:"トラ", color:"yellow"},
+  {name:"パンダ", color:"black"},
+  {name:"キツネ", color:"red"},
+  {name:"クマ", color:"darkbrown"},
+  {name:"カエル", color:"green"},
+  {name:"サル", color:"sienna"},
+  {name:"ライオン", color:"gold"}
+];
+
+let selectedPlayer = 0;
+let selectedEnemy = 1;
+
+const playerDiv = document.getElementById("playerSelect");
+const enemyDiv = document.getElementById("enemySelect");
+
+animals.forEach((a,i)=>{
+  let b1 = document.createElement("button");
+  b1.textContent = a.name;
+  b1.onclick = ()=> selectedPlayer = i;
+  playerDiv.appendChild(b1);
+
+  let b2 = document.createElement("button");
+  b2.textContent = a.name;
+  b2.onclick = ()=> selectedEnemy = i;
+  enemyDiv.appendChild(b2);
+});
+
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
@@ -25,14 +63,15 @@ document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
 document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
 class Fighter {
-  constructor(x,color) {
+  constructor(x, data) {
     this.x = x;
     this.y = canvas.height - 100;
     this.vx = 0;
     this.vy = 0;
     this.width = 40;
     this.height = 60;
-    this.color = color;
+    this.color = data.color;
+    this.name = data.name;
     this.onGround = false;
     this.hp = 100;
     this.hitTimer = 0;
@@ -59,6 +98,9 @@ class Fighter {
     ctx.fillStyle = this.hitTimer > 0 ? "yellow" : this.color;
     ctx.fillRect(this.x,this.y,this.width,this.height);
 
+    ctx.fillStyle = "white";
+    ctx.fillText(this.name, this.x, this.y - 5);
+
     if(this.attackTimer > 0) {
       ctx.fillStyle = this.attackType === "strong" ? "red" : "orange";
       ctx.fillRect(this.x + this.width, this.y+10, 30, 20);
@@ -66,8 +108,17 @@ class Fighter {
   }
 }
 
-const player = new Fighter(100,"blue");
-const enemy = new Fighter(canvas.width - 150,"red");
+let player, enemy;
+
+function startGame() {
+  document.getElementById("menu").style.display = "none";
+  canvas.style.display = "block";
+
+  player = new Fighter(100, animals[selectedPlayer]);
+  enemy = new Fighter(canvas.width - 150, animals[selectedEnemy]);
+
+  gameLoop();
+}
 
 function playerControl() {
   if(keys['a']) player.vx = -5;
@@ -84,16 +135,11 @@ function enemyAI() {
   if(player.x < enemy.x) enemy.vx = -2;
   else enemy.vx = 2;
 
-  // 攻撃
   if(Math.abs(player.x - enemy.x) < 70 && Math.random() < 0.02) {
     enemy.attackTimer = 15;
     enemy.attackType = Math.random() < 0.5 ? "weak" : "strong";
 
-    if(enemy.attackType === "weak") {
-      player.hp -= 5;
-    } else {
-      player.hp -= 15;
-    }
+    player.hp -= enemy.attackType === "weak" ? 5 : 15;
     player.hitTimer = 10;
   }
 }
@@ -102,10 +148,8 @@ function playerAttack(type) {
   player.attackTimer = 15;
   player.attackType = type;
 
-  let range = 70;
-  if(Math.abs(player.x - enemy.x) < range) {
-    if(type === "weak") enemy.hp -= 5;
-    else enemy.hp -= 15;
+  if(Math.abs(player.x - enemy.x) < 70) {
+    enemy.hp -= type === "weak" ? 5 : 15;
     enemy.hitTimer = 10;
   }
 }
@@ -115,31 +159,26 @@ document.addEventListener("keydown", e => {
   if(e.key.toLowerCase() === 'g') playerAttack("strong");
 });
 
-function drawHPBar(x,y,hp,color) {
+function drawHPBar(x,y,hp,color,label) {
   ctx.fillStyle = "gray";
   ctx.fillRect(x,y,300,20);
   ctx.fillStyle = color;
   ctx.fillRect(x,y,300 * (hp/100),20);
+  ctx.fillStyle = "white";
+  ctx.fillText(label, x, y-5);
 }
 
 function drawUI() {
-  // 下に大きく表示
-  drawHPBar(50, canvas.height-60, player.hp, "blue");
-  drawHPBar(canvas.width-350, canvas.height-60, enemy.hp, "red");
-
-  ctx.fillStyle = "white";
-  ctx.fillText("PLAYER", 50, canvas.height-70);
-  ctx.fillText("ENEMY", canvas.width-350, canvas.height-70);
+  drawHPBar(50, canvas.height-60, player.hp, player.color, player.name);
+  drawHPBar(canvas.width-350, canvas.height-60, enemy.hp, enemy.color, enemy.name);
 }
 
 function checkWin() {
   if(player.hp <= 0) {
-    alert("負け！");
-    location.reload();
+    alert("負け！"); location.reload();
   }
   if(enemy.hp <= 0) {
-    alert("勝ち！");
-    location.reload();
+    alert("勝ち！"); location.reload();
   }
 }
 
@@ -163,8 +202,6 @@ function gameLoop() {
 
   requestAnimationFrame(gameLoop);
 }
-
-gameLoop();
 </script>
 </body>
 </html>
