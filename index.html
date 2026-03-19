@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Mini Smash Game AI強化版</title>
+<title>Mini Smash Game 完全版</title>
 <style>
 body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
 canvas { display:none; background:#87ceeb; }
@@ -28,7 +28,8 @@ A/D 移動<br>
 W ジャンプ<br>
 F 弱攻撃<br>
 G 強攻撃<br>
-Space 回避
+E 必殺技<br>
+Space 回避(3回まで)
 </div>
 
 <canvas id="game"></canvas>
@@ -84,10 +85,12 @@ class Fighter {
     this.name = data.name;
     this.onGround = false;
     this.hp = 100;
-    this.hitTimer = 0;
+    this.attackCount = 0;
+    this.specialReady = false;
+    this.dodgeCount = 3;
+    this.dodgeTimer = 0;
     this.attackTimer = 0;
     this.attackType = "";
-    this.dodgeTimer = 0;
   }
 
   physics() {
@@ -101,7 +104,6 @@ class Fighter {
       this.onGround = true;
     }
 
-    if(this.hitTimer > 0) this.hitTimer--;
     if(this.attackTimer > 0) this.attackTimer--;
     if(this.dodgeTimer > 0) this.dodgeTimer--;
   }
@@ -113,8 +115,8 @@ class Fighter {
     ctx.globalAlpha = 1;
 
     if(this.attackTimer > 0) {
-      ctx.fillStyle = this.attackType === "strong" ? "red" : "orange";
-      ctx.fillRect(this.x + 30, this.y-30, 30, 20);
+      ctx.fillStyle = this.attackType === "special" ? "purple" : (this.attackType === "strong" ? "red" : "orange");
+      ctx.fillRect(this.x + 30, this.y-30, 40, 20);
     }
   }
 }
@@ -142,8 +144,9 @@ function playerControl() {
     player.onGround = false;
   }
 
-  if(keys[' '] && player.dodgeTimer <= 0) {
+  if(keys[' '] && player.dodgeTimer <= 0 && player.dodgeCount > 0) {
     player.dodgeTimer = 20;
+    player.dodgeCount--;
   }
 }
 
@@ -151,26 +154,40 @@ function enemyAI() {
   if(player.x < enemy.x) enemy.vx = -2;
   else enemy.vx = 2;
 
-  // ジャンプ
   if(Math.random() < 0.01 && enemy.onGround) {
     enemy.vy = -12;
     enemy.onGround = false;
   }
 
-  // 回避
-  if(Math.random() < 0.01 && enemy.dodgeTimer <= 0) {
+  if(Math.random() < 0.01 && enemy.dodgeTimer <= 0 && enemy.dodgeCount > 0) {
     enemy.dodgeTimer = 20;
+    enemy.dodgeCount--;
   }
 
-  // 攻撃
   if(Math.abs(player.x - enemy.x) < 70 && Math.random() < 0.02) {
+    let type = Math.random() < 0.5 ? "weak" : "strong";
     enemy.attackTimer = 15;
-    enemy.attackType = Math.random() < 0.5 ? "weak" : "strong";
+    enemy.attackType = type;
 
     if(player.dodgeTimer <= 0) {
-      player.hp -= enemy.attackType === "weak" ? 5 : 15;
-      player.hitTimer = 10;
+      player.hp -= type === "weak" ? 5 : 15;
     }
+
+    enemy.attackCount++;
+    if(enemy.attackCount >= 3) {
+      enemy.specialReady = true;
+      enemy.attackCount = 0;
+    }
+  }
+
+  // 必殺技
+  if(enemy.specialReady && Math.random() < 0.01) {
+    enemy.attackTimer = 20;
+    enemy.attackType = "special";
+
+    if(player.dodgeTimer <= 0) player.hp -= 25;
+
+    enemy.specialReady = false;
   }
 }
 
@@ -181,35 +198,48 @@ function playerAttack(type) {
   if(Math.abs(player.x - enemy.x) < 70) {
     if(enemy.dodgeTimer <= 0) {
       enemy.hp -= type === "weak" ? 5 : 15;
-      enemy.hitTimer = 10;
     }
   }
+
+  player.attackCount++;
+  if(player.attackCount >= 3) {
+    player.specialReady = true;
+    player.attackCount = 0;
+  }
+}
+
+function specialAttack() {
+  if(!player.specialReady) return;
+
+  player.attackTimer = 20;
+  player.attackType = "special";
+
+  if(Math.abs(player.x - enemy.x) < 80) {
+    if(enemy.dodgeTimer <= 0) enemy.hp -= 25;
+  }
+
+  player.specialReady = false;
 }
 
 document.addEventListener("keydown", e => {
   if(e.key.toLowerCase() === 'f') playerAttack("weak");
   if(e.key.toLowerCase() === 'g') playerAttack("strong");
+  if(e.key.toLowerCase() === 'e') specialAttack();
 });
 
-function drawHPBar(x,y,hp,label) {
-  ctx.fillStyle = "gray";
-  ctx.fillRect(x,y,300,20);
-  ctx.fillStyle = "lime";
-  ctx.fillRect(x,y,300 * (hp/100),20);
-  ctx.fillStyle = "white";
-  ctx.fillText(label, x, y-5);
-}
-
 function drawUI() {
-  drawHPBar(50, canvas.height-60, player.hp, player.emoji + " " + player.name);
-  drawHPBar(canvas.width-350, canvas.height-60, enemy.hp, enemy.emoji + " " + enemy.name);
+  ctx.fillStyle = "white";
+  ctx.fillText(`回避:${player.dodgeCount}`, 50, canvas.height-80);
+  ctx.fillText(`必殺:${player.specialReady ? "OK" : "×"}`, 50, canvas.height-100);
+
+  ctx.fillText(`回避:${enemy.dodgeCount}`, canvas.width-200, canvas.height-80);
 }
 
 function checkWin() {
-  if(player.hp <= 0) {
+  if(player.hp <= 0 || player.y > canvas.height) {
     alert("負け！"); location.reload();
   }
-  if(enemy.hp <= 0) {
+  if(enemy.hp <= 0 || enemy.y > canvas.height) {
     alert("勝ち！"); location.reload();
   }
 }
