@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Mini Smash Game 完全版</title>
+<title>Mini Smash Game スタミナ追加版</title>
 <style>
 body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
 canvas { display:none; background:#87ceeb; }
@@ -26,10 +26,10 @@ button { margin:5px; padding:10px 20px; font-size:16px; }
 操作:<br>
 A/D 移動<br>
 W ジャンプ<br>
-F 弱攻撃<br>
-G 強攻撃<br>
-E 必殺技<br>
-Space 回避(3回まで)
+F 弱攻撃（スタミナ小）<br>
+G 強攻撃（スタミナ中）<br>
+E 必殺技（スタミナ大）<br>
+Space 回避
 </div>
 
 <canvas id="game"></canvas>
@@ -85,6 +85,10 @@ class Fighter {
     this.name = data.name;
     this.onGround = false;
     this.hp = 100;
+
+    this.stamina = 100;
+    this.maxStamina = 100;
+
     this.attackCount = 0;
     this.specialReady = false;
     this.dodgeCount = 3;
@@ -106,6 +110,10 @@ class Fighter {
 
     if(this.attackTimer > 0) this.attackTimer--;
     if(this.dodgeTimer > 0) this.dodgeTimer--;
+
+    // スタミナ回復
+    this.stamina += 0.2;
+    if(this.stamina > this.maxStamina) this.stamina = this.maxStamina;
   }
 
   draw() {
@@ -144,9 +152,10 @@ function playerControl() {
     player.onGround = false;
   }
 
-  if(keys[' '] && player.dodgeTimer <= 0 && player.dodgeCount > 0) {
+  if(keys[' '] && player.dodgeTimer <= 0 && player.dodgeCount > 0 && player.stamina >= 10) {
     player.dodgeTimer = 20;
     player.dodgeCount--;
+    player.stamina -= 10;
   }
 }
 
@@ -159,31 +168,37 @@ function enemyAI() {
     enemy.onGround = false;
   }
 
-  if(Math.random() < 0.01 && enemy.dodgeTimer <= 0 && enemy.dodgeCount > 0) {
+  if(Math.random() < 0.01 && enemy.dodgeTimer <= 0 && enemy.dodgeCount > 0 && enemy.stamina >= 10) {
     enemy.dodgeTimer = 20;
     enemy.dodgeCount--;
+    enemy.stamina -= 10;
   }
 
   if(Math.abs(player.x - enemy.x) < 70 && Math.random() < 0.02) {
     let type = Math.random() < 0.5 ? "weak" : "strong";
-    enemy.attackTimer = 15;
-    enemy.attackType = type;
+    let cost = type === "weak" ? 5 : 15;
 
-    if(player.dodgeTimer <= 0) {
-      player.hp -= type === "weak" ? 5 : 15;
-    }
+    if(enemy.stamina >= cost) {
+      enemy.attackTimer = 15;
+      enemy.attackType = type;
+      enemy.stamina -= cost;
 
-    enemy.attackCount++;
-    if(enemy.attackCount >= 3) {
-      enemy.specialReady = true;
-      enemy.attackCount = 0;
+      if(player.dodgeTimer <= 0) {
+        player.hp -= type === "weak" ? 5 : 15;
+      }
+
+      enemy.attackCount++;
+      if(enemy.attackCount >= 3) {
+        enemy.specialReady = true;
+        enemy.attackCount = 0;
+      }
     }
   }
 
-  // 必殺技
-  if(enemy.specialReady && Math.random() < 0.01) {
+  if(enemy.specialReady && enemy.stamina >= 30 && Math.random() < 0.01) {
     enemy.attackTimer = 20;
     enemy.attackType = "special";
+    enemy.stamina -= 30;
 
     if(player.dodgeTimer <= 0) player.hp -= 25;
 
@@ -192,8 +207,12 @@ function enemyAI() {
 }
 
 function playerAttack(type) {
+  let cost = type === "weak" ? 5 : 15;
+  if(player.stamina < cost) return;
+
   player.attackTimer = 15;
   player.attackType = type;
+  player.stamina -= cost;
 
   if(Math.abs(player.x - enemy.x) < 70) {
     if(enemy.dodgeTimer <= 0) {
@@ -209,10 +228,11 @@ function playerAttack(type) {
 }
 
 function specialAttack() {
-  if(!player.specialReady) return;
+  if(!player.specialReady || player.stamina < 30) return;
 
   player.attackTimer = 20;
   player.attackType = "special";
+  player.stamina -= 30;
 
   if(Math.abs(player.x - enemy.x) < 80) {
     if(enemy.dodgeTimer <= 0) enemy.hp -= 25;
@@ -227,19 +247,31 @@ document.addEventListener("keydown", e => {
   if(e.key.toLowerCase() === 'e') specialAttack();
 });
 
-function drawUI() {
+function drawBar(x,y,value,max,color,label) {
+  ctx.fillStyle = "gray";
+  ctx.fillRect(x,y,300,15);
+  ctx.fillStyle = color;
+  ctx.fillRect(x,y,300 * (value/max),15);
   ctx.fillStyle = "white";
-  ctx.fillText(`回避:${player.dodgeCount}`, 50, canvas.height-80);
-  ctx.fillText(`必殺:${player.specialReady ? "OK" : "×"}`, 50, canvas.height-100);
+  ctx.fillText(label, x, y-5);
+}
 
-  ctx.fillText(`回避:${enemy.dodgeCount}`, canvas.width-200, canvas.height-80);
+function drawUI() {
+  drawBar(50, canvas.height-80, player.hp, 100, "lime", player.emoji + " HP");
+  drawBar(50, canvas.height-55, player.stamina, 100, "cyan", "ST");
+
+  drawBar(canvas.width-350, canvas.height-80, enemy.hp, 100, "lime", enemy.emoji + " HP");
+  drawBar(canvas.width-350, canvas.height-55, enemy.stamina, 100, "cyan", "ST");
+
+  ctx.fillStyle = "white";
+  ctx.fillText(`必殺:${player.specialReady ? "OK" : "×"}`, 50, canvas.height-100);
 }
 
 function checkWin() {
-  if(player.hp <= 0 || player.y > canvas.height) {
+  if(player.hp <= 0) {
     alert("負け！"); location.reload();
   }
-  if(enemy.hp <= 0 || enemy.y > canvas.height) {
+  if(enemy.hp <= 0) {
     alert("勝ち！"); location.reload();
   }
 }
