@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Mini Smash Game スタミナ追加版</title>
+<title>Mini Smash Game 吹っ飛び＆落下版</title>
 <style>
 body { margin:0; overflow:hidden; background:#222; font-family:sans-serif; }
 canvas { display:none; background:#87ceeb; }
@@ -26,9 +26,9 @@ button { margin:5px; padding:10px 20px; font-size:16px; }
 操作:<br>
 A/D 移動<br>
 W ジャンプ<br>
-F 弱攻撃（スタミナ小）<br>
-G 強攻撃（スタミナ中）<br>
-E 必殺技（スタミナ大）<br>
+F 弱攻撃<br>
+G 強攻撃<br>
+E 必殺技（吹っ飛ばす）<br>
 Space 回避
 </div>
 
@@ -102,6 +102,7 @@ class Fighter {
     this.x += this.vx;
     this.y += this.vy;
 
+    // 地面
     if(this.y + this.size > canvas.height - 20) {
       this.y = canvas.height - 20 - this.size;
       this.vy = 0;
@@ -159,6 +160,12 @@ function playerControl() {
   }
 }
 
+function applyKnockback(target, sourceX) {
+  let direction = target.x < sourceX ? -1 : 1;
+  target.vx = 10 * direction;
+  target.vy = -10;
+}
+
 function enemyAI() {
   if(player.x < enemy.x) enemy.vx = -2;
   else enemy.vx = 2;
@@ -195,12 +202,16 @@ function enemyAI() {
     }
   }
 
+  // 必殺技（吹っ飛び）
   if(enemy.specialReady && enemy.stamina >= 30 && Math.random() < 0.01) {
     enemy.attackTimer = 20;
     enemy.attackType = "special";
     enemy.stamina -= 30;
 
-    if(player.dodgeTimer <= 0) player.hp -= 25;
+    if(player.dodgeTimer <= 0) {
+      player.hp -= 25;
+      applyKnockback(player, enemy.x);
+    }
 
     enemy.specialReady = false;
   }
@@ -235,7 +246,10 @@ function specialAttack() {
   player.stamina -= 30;
 
   if(Math.abs(player.x - enemy.x) < 80) {
-    if(enemy.dodgeTimer <= 0) enemy.hp -= 25;
+    if(enemy.dodgeTimer <= 0) {
+      enemy.hp -= 25;
+      applyKnockback(enemy, player.x);
+    }
   }
 
   player.specialReady = false;
@@ -268,10 +282,11 @@ function drawUI() {
 }
 
 function checkWin() {
-  if(player.hp <= 0) {
+  // 落下 or HP0
+  if(player.hp <= 0 || player.y > canvas.height) {
     alert("負け！"); location.reload();
   }
-  if(enemy.hp <= 0) {
+  if(enemy.hp <= 0 || enemy.y > canvas.height) {
     alert("勝ち！"); location.reload();
   }
 }
